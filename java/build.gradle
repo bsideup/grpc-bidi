@@ -1,0 +1,28 @@
+plugins {
+	id 'idea'
+	id 'java-library'
+	id 'com.diffplug.spotless' version '6.25.0' apply false
+}
+
+apply from: "$rootDir/gradle/spotless.gradle"
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+tasks.withType(JavaCompile).configureEach {
+	sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
+	options.encoding = "UTF-8"
+}
+
+test {
+	useJUnitPlatform()
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	api platform('io.grpc:grpc-bom:1.66.0')
+
+	api 'io.grpc:grpc-netty'
+}
