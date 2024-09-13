@@ -3,21 +3,31 @@ package io.grpc.bidi;
 import io.grpc.ClientCall;
 import io.grpc.Metadata;
 import io.grpc.Status;
+import io.grpc.StatusException;
+import io.grpc.bidi.TunneledServerChannel.RetryingChannelHandler.RetryOption;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.AbstractServerChannel;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.DefaultChannelConfig;
 import io.netty.channel.EventLoop;
 import io.netty.channel.SingleThreadEventLoop;
 
 import java.net.SocketAddress;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class TunneledServerChannel extends AbstractServerChannel {
+
+	public static ChannelOption<Duration> MIN_BACKOFF = new RetryOption<>("minBackoff");
+
+	public static ChannelOption<Duration> MAX_BACKOFF = new RetryOption<>("maxBackoff");
 
 	private static final Logger log = Logger.getLogger(TunneledServerChannel.class.getName());
 
@@ -28,7 +38,27 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 		CLOSED,
 	}
 
-	private final ChannelConfig config = new DefaultChannelConfig(this);
+	private final RetryingChannelHandler retryingChannelHandler = new RetryingChannelHandler();
+
+	private final ChannelConfig config = new DefaultChannelConfig(this) {
+		@Override
+		public <T> boolean setOption(ChannelOption<T> option, T value) {
+			if (option instanceof RetryOption) {
+				return retryingChannelHandler.setOption(option, value);
+			}
+
+			return super.setOption(option, value);
+		}
+
+		@Override
+		public <T> T getOption(ChannelOption<T> option) {
+			if (option instanceof RetryOption) {
+				return retryingChannelHandler.getOption(option);
+			}
+
+			return super.getOption(option);
+		}
+	};
 
 	private volatile State state = State.INITIAL;
 
@@ -85,33 +115,10 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 			channelAddress.callOptions
 		);
 
-		ChannelPipeline channelPipeline = pipeline();
-
 		CallChannel callChannel = new CallChannel(call, channelAddress.headers);
-		// Retry the connection
-		// TODO retry delay?
-		callChannel
-			.pipeline()
-			.addLast(
-				new ChannelInboundHandlerAdapter() {
-					@Override
-					public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-						super.channelReadComplete(ctx);
+		callChannel.pipeline().addLast(retryingChannelHandler);
 
-						log.log(Level.INFO, "Channel closure");
-						channelPipeline.fireChannelReadComplete();
-					}
-
-					@Override
-					public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-						super.exceptionCaught(ctx, cause);
-
-						log.log(Level.WARNING, cause, () -> "Unexpected channel closure");
-						channelPipeline.fireChannelReadComplete();
-					}
-				}
-			);
-		channelPipeline.fireChannelRead(callChannel);
+		pipeline().fireChannelRead(callChannel);
 	}
 
 	class CallChannel extends TunnelChannel {
@@ -119,6 +126,8 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 		final ClientCall<ByteBuf, ByteBuf> call;
 
 		final Metadata headers;
+
+		volatile boolean ready;
 
 		CallChannel(ClientCall<ByteBuf, ByteBuf> call, Metadata headers) {
 			super(TunneledServerChannel.this);
@@ -146,7 +155,18 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 			call.cancel("Deregistered", null);
 		}
 
+		@Override
+		public boolean isActive() {
+			return ready;
+		}
+
 		private class CallListener extends ClientCall.Listener<ByteBuf> {
+
+			@Override
+			public void onHeaders(Metadata headers) {
+				ready = true;
+				pipeline().fireChannelActive();
+			}
 
 			@Override
 			public void onMessage(ByteBuf bytes) {
@@ -159,16 +179,94 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 
 			@Override
 			public void onClose(Status status, Metadata trailers) {
-				switch (status.getCode()) {
+				pipeline().fireExceptionCaught(status.asException());
+			}
+		}
+	}
+
+	@ChannelHandler.Sharable
+	static class RetryingChannelHandler extends ChannelInboundHandlerAdapter {
+
+		private static final int BACKOFF_MULTIPLIER = 2;
+
+		static class RetryOption<T> extends ChannelOption<T> {
+			@SuppressWarnings("deprecation")
+			RetryOption(String name) {
+				super(name);
+			}
+		}
+
+		private Duration minBackoff = Duration.ofMillis(100);
+
+		private Duration maxBackoff = Duration.ofSeconds(5);
+
+		private long backoffMs = minBackoff.toMillis();
+
+		@Override
+		public void channelActive(ChannelHandlerContext ctx) throws Exception {
+			// Reset
+			backoffMs = minBackoff.toMillis();
+			super.channelActive(ctx);
+		}
+
+		@Override
+		public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+			if (cause instanceof StatusException) {
+				switch (((StatusException) cause).getStatus().getCode()) {
 					case CANCELLED:
 					case OK:
+						log.log(Level.INFO, "Bidi channel closed");
+						break;
 					case UNAVAILABLE:
-						pipeline().fireChannelReadComplete();
+						log.log(Level.WARNING, cause.getCause(), () -> "Bidi channel is unavailable");
 						break;
 					default:
-						pipeline().fireExceptionCaught(status.asException());
+						log.log(Level.WARNING, cause, () -> "Unexpected bidi channel exception");
+						break;
 				}
+			} else {
+				super.exceptionCaught(ctx, cause);
 			}
+
+			Channel parent = ctx.channel().parent();
+
+			backoffMs = Math.min(backoffMs * BACKOFF_MULTIPLIER, maxBackoff.toMillis());
+			parent.eventLoop().schedule(parent.pipeline()::fireChannelReadComplete, backoffMs, TimeUnit.MILLISECONDS);
+		}
+
+		public <T> boolean setOption(ChannelOption<T> option, T value) {
+			if (option == MIN_BACKOFF) {
+				Duration duration = (Duration) value;
+				if (duration.toMillis() <= 0) {
+					throw new IllegalArgumentException(option + " must be positive!");
+				}
+				minBackoff = duration.dividedBy(BACKOFF_MULTIPLIER);
+				backoffMs = minBackoff.toMillis();
+				return true;
+			}
+
+			if (option == MAX_BACKOFF) {
+				Duration duration = (Duration) value;
+				if (duration.toMillis() <= 0) {
+					throw new IllegalArgumentException(option + " must be positive!");
+				}
+				maxBackoff = duration;
+				return true;
+			}
+
+			return false;
+		}
+
+		public <T> T getOption(ChannelOption<T> option) {
+			if (option == MIN_BACKOFF) {
+				return (T) minBackoff.multipliedBy(BACKOFF_MULTIPLIER);
+			}
+
+			if (option == MAX_BACKOFF) {
+				return (T) maxBackoff;
+			}
+
+			return null;
 		}
 	}
 }

@@ -61,6 +61,11 @@ public abstract class ClientChannelService implements BindableService {
 				}
 
 				@Override
+				public boolean isActive() {
+					return !call.isCancelled();
+				}
+
+				@Override
 				protected void doClose() {
 					try {
 						if (!call.isCancelled()) {

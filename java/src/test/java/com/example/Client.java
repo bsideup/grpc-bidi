@@ -15,6 +15,7 @@ import io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.netty.channel.DefaultEventLoopGroup;
 
+import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,6 +33,8 @@ public class Client {
 			.workerEventLoopGroup(new DefaultEventLoopGroup())
 			.bossEventLoopGroup(new DefaultEventLoopGroup())
 			//
+			.withOption(TunneledServerChannel.MIN_BACKOFF, Duration.ofMillis(500))
+			.withOption(TunneledServerChannel.MAX_BACKOFF, Duration.ofSeconds(10))
 			.permitKeepAliveWithoutCalls(true)
 			.directExecutor()
 			.addService(

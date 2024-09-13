@@ -65,11 +65,6 @@ abstract class TunnelChannel extends AbstractChannel {
 	}
 
 	@Override
-	public boolean isActive() {
-		return isOpen();
-	}
-
-	@Override
 	protected void doClose() {
 		closed.set(true);
 	}
