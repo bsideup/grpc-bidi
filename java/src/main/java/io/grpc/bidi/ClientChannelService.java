@@ -24,10 +24,8 @@ public abstract class ClientChannelService implements BindableService {
 
 	static final String TUNNEL_SERVICE = "io.grpc.Tunnel";
 
-	public static final MethodDescriptor<ByteBuf, ByteBuf> NEW_TUNNEL_METHOD = MethodDescriptor.newBuilder(
-			ByteBufMarshaller.INSTANCE,
-			ByteBufMarshaller.INSTANCE
-		)
+	public static final MethodDescriptor<ByteBuf, ByteBuf> NEW_TUNNEL_METHOD = MethodDescriptor
+		.newBuilder(ByteBufMarshaller.INSTANCE, ByteBufMarshaller.INSTANCE)
 		.setFullMethodName(TUNNEL_SERVICE + "/new")
 		.setType(MethodDescriptor.MethodType.BIDI_STREAMING)
 		.build();
@@ -36,9 +34,7 @@ public abstract class ClientChannelService implements BindableService {
 
 	@Override
 	public final ServerServiceDefinition bindService() {
-		return ServerServiceDefinition.builder(TUNNEL_SERVICE)
-			.addMethod(NEW_TUNNEL_METHOD, new TunnelHandler())
-			.build();
+		return ServerServiceDefinition.builder(TUNNEL_SERVICE).addMethod(NEW_TUNNEL_METHOD, new TunnelHandler()).build();
 	}
 
 	public void tune(NettyChannelBuilder builder) {}
@@ -59,7 +55,6 @@ public abstract class ClientChannelService implements BindableService {
 			DefaultEventLoopGroup eventLoopGroup = new DefaultEventLoopGroup();
 
 			TunnelChannel channel = new TunnelChannel() {
-
 				@Override
 				protected void doConsume(ByteBuf byteBuf) {
 					call.sendMessage(byteBuf.retain());
@@ -93,7 +88,6 @@ public abstract class ClientChannelService implements BindableService {
 			onChannel(grpcChannel, headers);
 
 			return new ServerCall.Listener<ByteBuf>() {
-
 				@Override
 				public void onMessage(ByteBuf byteBuf) {
 					if (byteBuf.readableBytes() > 0) {

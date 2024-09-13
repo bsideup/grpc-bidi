@@ -12,7 +12,8 @@ import io.grpc.stub.StreamObserver;
 public class Server {
 
 	public static void main(String[] args) throws Exception {
-		ServerBuilder.forPort(50051)
+		ServerBuilder
+			.forPort(50051)
 			.addService(
 				new ClientChannelService() {
 					@Override

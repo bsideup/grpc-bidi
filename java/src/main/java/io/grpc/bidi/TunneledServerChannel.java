@@ -36,7 +36,7 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 
 	@Override
 	protected void doBind(SocketAddress address) {
-		this.channelAddress = ((ChannelAddress) address);
+		this.channelAddress = (ChannelAddress) address;
 
 		state = State.ACTIVE;
 	}
@@ -51,12 +51,10 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 		switch (state) {
 			case INITIAL:
 			case OPEN:
-			case ACTIVE: {
+			case ACTIVE:
 				return true;
-			}
-			default: {
+			default:
 				return false;
-			}
 		}
 	}
 
@@ -164,13 +162,11 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 				switch (status.getCode()) {
 					case CANCELLED:
 					case OK:
-					case UNAVAILABLE: {
+					case UNAVAILABLE:
 						pipeline().fireChannelReadComplete();
 						break;
-					}
-					default: {
+					default:
 						pipeline().fireExceptionCaught(status.asException());
-					}
 				}
 			}
 		}

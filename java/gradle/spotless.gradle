@@ -7,7 +7,7 @@ spotless {
 		trimTrailingWhitespace()
 		endWithNewline()
 
-		prettier(['prettier': '3.3.3', 'prettier-plugin-java': '2.6.4'])
+		prettier(['prettier': '3.3.3', 'prettier-plugin-java': '2.5.0'])
 			.config([
 				'parser'    : 'java',
 				'useTabs'	: true,
