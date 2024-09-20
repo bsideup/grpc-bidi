@@ -28,6 +28,10 @@ final class TunneledServerChannel extends AbstractServerChannel {
 
 	private static final Logger log = Logger.getLogger(TunneledServerChannel.class.getName());
 
+	static ChannelOption<Duration> MIN_BACKOFF = new RetryOption<>("minBackoff");
+
+	static ChannelOption<Duration> MAX_BACKOFF = new RetryOption<>("maxBackoff");
+
 	enum State {
 		INITIAL,
 		OPEN,
@@ -242,7 +246,7 @@ final class TunneledServerChannel extends AbstractServerChannel {
 		}
 
 		public <T> boolean setOption(ChannelOption<T> option, T value) {
-			if (option == ChannelServerBuilder.MIN_BACKOFF) {
+			if (option == MIN_BACKOFF) {
 				Duration duration = (Duration) value;
 				if (duration.toMillis() <= 0) {
 					throw new IllegalArgumentException(option + " must be positive!");
@@ -252,7 +256,7 @@ final class TunneledServerChannel extends AbstractServerChannel {
 				return true;
 			}
 
-			if (option == ChannelServerBuilder.MAX_BACKOFF) {
+			if (option == MAX_BACKOFF) {
 				Duration duration = (Duration) value;
 				if (duration.toMillis() <= 0) {
 					throw new IllegalArgumentException(option + " must be positive!");
@@ -265,11 +269,11 @@ final class TunneledServerChannel extends AbstractServerChannel {
 		}
 
 		public <T> T getOption(ChannelOption<T> option) {
-			if (option == ChannelServerBuilder.MIN_BACKOFF) {
+			if (option == MIN_BACKOFF) {
 				return (T) minBackoff.multipliedBy(BACKOFF_MULTIPLIER);
 			}
 
-			if (option == ChannelServerBuilder.MAX_BACKOFF) {
+			if (option == MAX_BACKOFF) {
 				return (T) maxBackoff;
 			}
 

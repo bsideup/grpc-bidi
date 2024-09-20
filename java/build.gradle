@@ -25,7 +25,8 @@ dependencies {
 	api platform('io.grpc:grpc-bom:1.66.0')
 	testImplementation platform('com.google.protobuf:protobuf-bom:4.28.0')
 
-	api 'io.grpc:grpc-netty'
+	api 'io.grpc:grpc-api'
+	implementation 'io.grpc:grpc-netty'
 
 	testImplementation 'com.google.protobuf:protobuf-java'
 	testImplementation 'io.grpc:grpc-services'

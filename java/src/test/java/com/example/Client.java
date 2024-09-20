@@ -22,19 +22,24 @@ public class Client {
 	public static void main(String[] args) throws Exception {
 		Channel networkChannel = ManagedChannelBuilder.forAddress("localhost", 50051).usePlaintext().build();
 
-		ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+		Server server = createServer(networkChannel);
 
-		Server server = ChannelServerBuilder
+		server.start().awaitTermination();
+	}
+
+	static Server createServer(Channel networkChannel) {
+		return ChannelServerBuilder
 			.forChannel(networkChannel)
 			// Everything else is optional
 			.withCallOptions(CallOptions.DEFAULT)
 			.withMetadata(new Metadata())
-			.withOption(ChannelServerBuilder.MIN_BACKOFF, Duration.ofMillis(500))
-			.withOption(ChannelServerBuilder.MAX_BACKOFF, Duration.ofSeconds(10))
+			.withRetryBackoff(Duration.ofMillis(500), Duration.ofSeconds(5))
 			.permitKeepAliveWithoutCalls(true)
 			.directExecutor()
 			.addService(
 				new HealthGrpc.HealthImplBase() {
+					final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+
 					@Override
 					public void watch(HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {
 						System.out.println("Received request: " + request);
@@ -45,7 +50,5 @@ public class Client {
 				}
 			)
 			.build();
-
-		server.start().awaitTermination();
 	}
 }

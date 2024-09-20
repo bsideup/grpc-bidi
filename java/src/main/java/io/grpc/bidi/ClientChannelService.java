@@ -2,6 +2,7 @@ package io.grpc.bidi;
 
 import io.grpc.BindableService;
 import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.ServerCall;
@@ -37,7 +38,7 @@ public abstract class ClientChannelService implements BindableService {
 		return ServerServiceDefinition.builder(TUNNEL_SERVICE).addMethod(NEW_TUNNEL_METHOD, new TunnelHandler()).build();
 	}
 
-	public void tune(NettyChannelBuilder builder) {}
+	public void tune(ManagedChannelBuilder<?> builder) {}
 
 	class TunnelHandler implements ServerCallHandler<ByteBuf, ByteBuf> {
 

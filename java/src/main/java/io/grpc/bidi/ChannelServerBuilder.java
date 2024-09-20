@@ -1,23 +1,16 @@
 package io.grpc.bidi;
 
-import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ForwardingServerBuilder;
 import io.grpc.Metadata;
 import io.grpc.Server;
-import io.grpc.bidi.TunneledServerChannel.RetryingChannelHandler.RetryOption;
 import io.grpc.netty.NettyServerBuilder;
-import io.netty.channel.ChannelOption;
 import io.netty.channel.DefaultEventLoopGroup;
 
 import java.time.Duration;
 
 public final class ChannelServerBuilder extends ForwardingServerBuilder<ChannelServerBuilder> {
-
-	public static ChannelOption<Duration> MIN_BACKOFF = new RetryOption<>("minBackoff");
-
-	public static ChannelOption<Duration> MAX_BACKOFF = new RetryOption<>("maxBackoff");
 
 	public static ChannelServerBuilder forChannel(Channel channel) {
 		return new ChannelServerBuilder(NettyServerBuilder.forAddress(new ChannelAddress(channel)));
@@ -33,9 +26,19 @@ public final class ChannelServerBuilder extends ForwardingServerBuilder<ChannelS
 		this.nettyServerBuilder = nettyServerBuilder;
 	}
 
-	@CanIgnoreReturnValue
-	public <T> ChannelServerBuilder withOption(ChannelOption<T> option, T value) {
-		this.nettyServerBuilder.withOption(option, value);
+	public ChannelServerBuilder withRetryBackoff(Duration minBackoff, Duration maxBackoff) {
+		withMinBackoff(minBackoff);
+		withMaxBackoff(maxBackoff);
+		return this;
+	}
+
+	public ChannelServerBuilder withMinBackoff(Duration minBackoff) {
+		nettyServerBuilder.withOption(TunneledServerChannel.MIN_BACKOFF, minBackoff);
+		return this;
+	}
+
+	public ChannelServerBuilder withMaxBackoff(Duration maxBackoff) {
+		nettyServerBuilder.withOption(TunneledServerChannel.MAX_BACKOFF, maxBackoff);
 		return this;
 	}
 
