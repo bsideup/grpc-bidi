@@ -1,7 +1,7 @@
 package com.example;
 
 import io.grpc.CallOptions;
-import io.grpc.ManagedChannel;
+import io.grpc.Channel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.Server;
@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 public class Client {
 
 	public static void main(String[] args) throws Exception {
-		ManagedChannel networkChannel = ManagedChannelBuilder.forAddress("localhost", 50051).usePlaintext().build();
+		Channel networkChannel = ManagedChannelBuilder.forAddress("localhost", 50051).usePlaintext().build();
 
 		ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
 

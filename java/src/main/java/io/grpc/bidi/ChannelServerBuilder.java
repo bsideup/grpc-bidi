@@ -2,8 +2,8 @@ package io.grpc.bidi;
 
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import io.grpc.CallOptions;
+import io.grpc.Channel;
 import io.grpc.ForwardingServerBuilder;
-import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
 import io.grpc.Server;
 import io.grpc.bidi.TunneledServerChannel.RetryingChannelHandler.RetryOption;
@@ -19,7 +19,7 @@ public final class ChannelServerBuilder extends ForwardingServerBuilder<ChannelS
 
 	public static ChannelOption<Duration> MAX_BACKOFF = new RetryOption<>("maxBackoff");
 
-	public static ChannelServerBuilder forChannel(ManagedChannel channel) {
+	public static ChannelServerBuilder forChannel(Channel channel) {
 		return new ChannelServerBuilder(NettyServerBuilder.forAddress(new ChannelAddress(channel)));
 	}
 
