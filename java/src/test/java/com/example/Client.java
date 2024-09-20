@@ -5,15 +5,12 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.Server;
-import io.grpc.bidi.ChannelAddress;
-import io.grpc.bidi.TunneledServerChannel;
+import io.grpc.bidi.ChannelServerBuilder;
 import io.grpc.health.v1.HealthCheckRequest;
 import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.health.v1.HealthGrpc;
-import io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
-import io.netty.channel.DefaultEventLoopGroup;
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
@@ -27,14 +24,13 @@ public class Client {
 
 		ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
 
-		Server server = NettyServerBuilder
-			.forAddress(ChannelAddress.of(networkChannel, CallOptions.DEFAULT, new Metadata()))
-			.channelType(TunneledServerChannel.class)
-			.workerEventLoopGroup(new DefaultEventLoopGroup())
-			.bossEventLoopGroup(new DefaultEventLoopGroup())
-			//
-			.withOption(TunneledServerChannel.MIN_BACKOFF, Duration.ofMillis(500))
-			.withOption(TunneledServerChannel.MAX_BACKOFF, Duration.ofSeconds(10))
+		Server server = ChannelServerBuilder
+			.forChannel(networkChannel)
+			// Everything else is optional
+			.withCallOptions(CallOptions.DEFAULT)
+			.withMetadata(new Metadata())
+			.withOption(ChannelServerBuilder.MIN_BACKOFF, Duration.ofMillis(500))
+			.withOption(ChannelServerBuilder.MAX_BACKOFF, Duration.ofSeconds(10))
 			.permitKeepAliveWithoutCalls(true)
 			.directExecutor()
 			.addService(

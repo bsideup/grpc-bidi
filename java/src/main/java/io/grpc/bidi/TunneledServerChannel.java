@@ -1,5 +1,6 @@
 package io.grpc.bidi;
 
+import io.grpc.CallOptions;
 import io.grpc.ClientCall;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -23,11 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public final class TunneledServerChannel extends AbstractServerChannel {
-
-	public static ChannelOption<Duration> MIN_BACKOFF = new RetryOption<>("minBackoff");
-
-	public static ChannelOption<Duration> MAX_BACKOFF = new RetryOption<>("maxBackoff");
+final class TunneledServerChannel extends AbstractServerChannel {
 
 	private static final Logger log = Logger.getLogger(TunneledServerChannel.class.getName());
 
@@ -60,9 +57,18 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 		}
 	};
 
+	private final CallOptions callOptions;
+
+	private final Metadata metadata;
+
 	private volatile State state = State.INITIAL;
 
 	private volatile ChannelAddress channelAddress;
+
+	public TunneledServerChannel(CallOptions callOptions, Metadata metadata) {
+		this.callOptions = callOptions;
+		this.metadata = metadata;
+	}
 
 	@Override
 	protected void doBind(SocketAddress address) {
@@ -112,10 +118,10 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 	protected void doBeginRead() {
 		ClientCall<ByteBuf, ByteBuf> call = channelAddress.channel.newCall(
 			ClientChannelService.NEW_TUNNEL_METHOD,
-			channelAddress.callOptions
+			callOptions
 		);
 
-		CallChannel callChannel = new CallChannel(call, channelAddress.headers);
+		CallChannel callChannel = new CallChannel(call, metadata);
 		callChannel.pipeline().addLast(retryingChannelHandler);
 
 		pipeline().fireChannelRead(callChannel);
@@ -190,6 +196,7 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 		private static final int BACKOFF_MULTIPLIER = 2;
 
 		static class RetryOption<T> extends ChannelOption<T> {
+
 			@SuppressWarnings("deprecation")
 			RetryOption(String name) {
 				super(name);
@@ -235,7 +242,7 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 		}
 
 		public <T> boolean setOption(ChannelOption<T> option, T value) {
-			if (option == MIN_BACKOFF) {
+			if (option == ChannelServerBuilder.MIN_BACKOFF) {
 				Duration duration = (Duration) value;
 				if (duration.toMillis() <= 0) {
 					throw new IllegalArgumentException(option + " must be positive!");
@@ -245,7 +252,7 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 				return true;
 			}
 
-			if (option == MAX_BACKOFF) {
+			if (option == ChannelServerBuilder.MAX_BACKOFF) {
 				Duration duration = (Duration) value;
 				if (duration.toMillis() <= 0) {
 					throw new IllegalArgumentException(option + " must be positive!");
@@ -258,11 +265,11 @@ public final class TunneledServerChannel extends AbstractServerChannel {
 		}
 
 		public <T> T getOption(ChannelOption<T> option) {
-			if (option == MIN_BACKOFF) {
+			if (option == ChannelServerBuilder.MIN_BACKOFF) {
 				return (T) minBackoff.multipliedBy(BACKOFF_MULTIPLIER);
 			}
 
-			if (option == MAX_BACKOFF) {
+			if (option == ChannelServerBuilder.MAX_BACKOFF) {
 				return (T) maxBackoff;
 			}
 
