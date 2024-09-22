@@ -1,4 +1,4 @@
-module github.com/bsideup/grpc-bidi/go
+module github.com/bsideup/grpc-bidi/go/client
 
 go 1.22
 
