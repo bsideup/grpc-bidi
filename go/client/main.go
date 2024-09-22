@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	bidi "github.com/bsideup/grpc-bidi/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	health "google.golang.org/grpc/health/grpc_health_v1"
@@ -17,7 +18,7 @@ func (s *simpleHealthService) Check(context.Context, *health.HealthCheckRequest)
 	panic("unimplemented")
 }
 
-func (s *simpleHealthService) Watch(req *health.HealthCheckRequest, watcher health.Health_WatchServer) error {
+func (s *simpleHealthService) Watch(_ *health.HealthCheckRequest, watcher health.Health_WatchServer) error {
 	for {
 		select {
 		case <-watcher.Context().Done():
@@ -46,7 +47,7 @@ func main() {
 	server := grpc.NewServer()
 	health.RegisterHealthServer(server, &simpleHealthService{})
 
-	if err := server.Serve(&ConnListener{conn: conn}); err != nil {
+	if err := server.Serve(bidi.NewListener(conn)); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
 }
