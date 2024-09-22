@@ -34,15 +34,7 @@ func RegisterServer(server *grpc.Server, fn func(context.Context, *grpc.ClientCo
 						return fmt.Errorf("failed to create client: %w", err)
 					}
 
-					ctx, cancel := context.WithCancelCause(stream.Context())
-
-					go func() {
-						err := fn(ctx, client)
-						cancel(err)
-					}()
-
-					<-ctx.Done()
-					return ctx.Err()
+					return fn(stream.Context(), client)
 				},
 			}},
 		},
